@@ -135,7 +135,7 @@ if __name__ == "__main__":
                                   ntree_limit=getattr(model_xgb, "best_ntree_limit", 0),
                                   validate_features=False)
 
-    # generate the mean of the results predicted by the two models and calculate the mae
+    # generate the mean of the results predicted by the two models and calculate the rmse
     pred_mean = np.mean(np.array([pred_catboost, pred_xgb]), axis=0)
     val_rmse = mean_squared_error(y_validation, pred_mean, squared=False)
     print(f"Final evaluation result: validation-rmse:{val_rmse}")
