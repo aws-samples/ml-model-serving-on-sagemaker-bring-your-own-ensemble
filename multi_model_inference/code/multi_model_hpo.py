@@ -23,16 +23,14 @@ from catboost import CatBoostRegressor
 
 import joblib
 import json
-import logging
 import sys
 import csv
 import pickle
 from my_custom_library import cross_validation, cross_validation_catboost
 from sagemaker_containers import _content_types
 import xgboost as xgb
+from sklearn.metrics import mean_squared_error
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
 
 model_file_name = 'catboost-regressor-model.dump'
 
@@ -82,13 +80,12 @@ if __name__ == "__main__":
     raw_data = [pd.read_csv(file, header=None, engine="python") for file in validation_input_files]
     validation_df = pd.concat(raw_data)
 
-#     Assumption is that the label is the last column
+    # Assumption is that the label is the last column
     print('building training and validation datasets')
     X_train = train_df.iloc[:, :-1].values
     y_train = train_df.iloc[:, -1:].values
     X_validation = validation_df.iloc[:, :-1].values
     y_validation = validation_df.iloc[:, -1:].values
-
     
     
     """
@@ -97,31 +94,23 @@ if __name__ == "__main__":
     
     K = args.k_fold
     
-    
     catboost_hyperparameters = {
         "max_depth": args.max_depth,
         "eta": args.eta,
     }
 
-        
-    # define and train model
-#     model = CatBoostRegressor()
-#     model.fit(X_train, y_train, eval_set=(X_validation, y_validation), logging_level='Silent')
+    rmse_list, model_catboost = cross_validation_catboost(train_df, K, catboost_hyperparameters)
+    k_fold_avg = sum(rmse_list) / len(rmse_list)
+    print(f"RMSE average across folds for CatBoost model: {k_fold_avg}")
 
-    rmse_list, model = cross_validation_catboost(train_df, K, catboost_hyperparameters)
+    # generate model predictions against the validation dataset
+    pred_catboost = model_catboost.predict(X_validation)
 
-    # print abs error
-    print('validating model')
-    abs_err = np.abs(model.predict(X_validation) - y_validation)
-
-    # print couple perf metrics
-    for q in [10, 50, 90]:
-        print('AE-at-' + str(q) + 'th-percentile: ' + str(np.percentile(a=abs_err, q=q)))
 
     # persist model
     path = os.path.join(args.model_dir, model_file_name)
     print('saving model file to {}'.format(path))
-    model.save_model(path)
+    model_catboost.save_model(path)
     
     
     
@@ -136,13 +125,25 @@ if __name__ == "__main__":
         "num_round": args.num_round,
     }
 
-    rmse_list, model = cross_validation(train_df, K, hyperparameters)
+    rmse_list, model_xgb = cross_validation(train_df, K, hyperparameters)
     k_fold_avg = sum(rmse_list) / len(rmse_list)
-    print(f"RMSE average across folds: {k_fold_avg}")
+    print(f"RMSE average across folds for XGBoost model: {k_fold_avg}")
+    
+    # get the prediction results against the validation dataset of the xgboost model
+    dtest = xgb.DMatrix(X_validation)
+    pred_xgb = model_xgb.predict(dtest,
+                                  ntree_limit=getattr(model_xgb, "best_ntree_limit", 0),
+                                  validate_features=False)
+
+    # generate the mean of the results predicted by the two models and calculate the mae
+    pred_mean = np.mean(np.array([pred_catboost, pred_xgb]), axis=0)
+    val_rmse = mean_squared_error(y_validation, pred_mean, squared=False)
+    print(f"Final evaluation result: validation-rmse:{val_rmse}")
+    
 
     model_location = args.model_dir + "/xgboost-model"
-    pickle.dump(model, open(model_location, "wb"))
-    logging.info("Stored trained model at {}".format(model_location))
+    pickle.dump(model_xgb, open(model_location, "wb"))
+    print("Stored trained model at {}".format(model_location))
 
 
     print("Training Completed")
@@ -170,21 +171,11 @@ def model_fn(model_dir):
 
 
 def predict_fn(input_data, model):
-#     print('Invoked with {} records'.format(input_data.shape[0]))
-#     np_array = decoder.decode(input_data, content_type)
-#     reader = csv.reader(input_data, delimiter=',')
+
     predictions_catb = model[0].predict(input_data)
     print("catboost results:")
     print(predictions_catb)
 
-    
-#     csv_string = input_data.decode() if isinstance(input_data, bytes) else input_data
-#     sniff_delimiter = csv.Sniffer().sniff(csv_string.split('\n')[0][:512]).delimiter
-#     delimiter = ',' if sniff_delimiter.isalnum() else sniff_delimiter
-#     logging.info("Determined delimiter of CSV input is \'{}\'".format(delimiter))
-
-#     np_payload = np.array(list(map(lambda x: _clean_csv_string(x, delimiter),     
-#                                    csv_string.split('\n')))).astype(dtype)
     dtest = xgb.DMatrix(input_data)
     predictions_xgb = model[1].predict(dtest,
                                           ntree_limit=getattr(model, "best_ntree_limit", 0),

@@ -21,8 +21,9 @@ def cross_validation(df, K, hyperparameters):
     for i in range(len(k_folds)):
         training_folds = [fold for j, fold in enumerate(k_folds) if j != i]
         training_indices = np.concatenate(training_folds)
-        x_train, y_train = df.iloc[training_indices, 1:], df.iloc[training_indices, :1]
-        x_validation, y_validation = df.iloc[k_folds[i], 1:], df.iloc[k_folds[i], :1]
+        x_train, y_train = df.iloc[training_indices, :-1], df.iloc[training_indices, -1]
+        x_validation, y_validation = df.iloc[k_folds[i], :-1], df.iloc[k_folds[i], -1]
+
         dtrain = xgb.DMatrix(data=x_train, label=y_train)
         dvalidation = xgb.DMatrix(data=x_validation, label=y_validation)
 
@@ -53,15 +54,15 @@ def cross_validation_catboost(df, K, hyperparameters):
     for i in range(len(k_folds)):
         training_folds = [fold for j, fold in enumerate(k_folds) if j != i]
         training_indices = np.concatenate(training_folds)
-        x_train, y_train = df.iloc[training_indices, 1:], df.iloc[training_indices, :1]
-        x_validation, y_validation = df.iloc[k_folds[i], 1:], df.iloc[k_folds[i], :1]
-        
+        x_train, y_train = df.iloc[training_indices, :-1], df.iloc[training_indices, -1]
+        x_validation, y_validation = df.iloc[k_folds[i], :-1], df.iloc[k_folds[i], -1]
+
         model = CatBoostRegressor(**hyperparameters)
         model.fit(x_train, y_train, eval_set=(x_validation, y_validation), logging_level='Silent')
         
 
         eval_results = model.predict(x_validation)
-        rms = mean_squared_error(y_validation, eval_results, squared=True)
+        rms = mean_squared_error(y_validation, eval_results, squared=False)
         print(f'[{i}]\tvalidation-rmse:{rms}')
         rmse_list.append(rms)
     return rmse_list, model
