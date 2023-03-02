@@ -1,4 +1,4 @@
-# Amazon SageMaker Bring Your Own Scripts and Container
+# Amazon SageMaker Bring Your Own Ensemble
 
 This git repo was developed based on the git repository [Amazon SageMaker Local Mode Examples](https://github.com/aws-samples/amazon-sagemaker-local-mode), which shows different examples of running SageMaker Training and Serving in local instance/machine.
 
