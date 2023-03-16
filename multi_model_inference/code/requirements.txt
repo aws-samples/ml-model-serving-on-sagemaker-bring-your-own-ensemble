@@ -1,4 +1,3 @@
-numpy==1.19.2
 pandas
 catboost==0.26
 xgboost==1.0.1
