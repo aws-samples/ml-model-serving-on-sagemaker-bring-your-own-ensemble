@@ -16,7 +16,6 @@ If you are running the above example on your own computer/machine in local mode,
   
 - **S3** – Low cost, prices will vary depending on the size of the models/artifacts stored. The first 50 TB each month will cost only $0.023 per GB stored. For more information, see [Amazon S3 Pricing](https://aws.amazon.com/s3/pricing/).
 
-- **ECR** – Low cost, you pay only for the amount of data you store in your public or private repositories. For more information, see [Amazon Elastic Container Registry pricing](https://aws.amazon.com/ecr/pricing/).
 
 ## Security
 
